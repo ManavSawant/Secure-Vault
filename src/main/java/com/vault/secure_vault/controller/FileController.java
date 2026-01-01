@@ -26,11 +26,12 @@ public class FileController {
         return fileService.uploadFile(file, authentication.getName());
     }
 
+    @GetMapping("/listFiles")
     public List<FileUploadResponseDTO> listOfFiles(Authentication authentication) {
         return fileService.listUserFiles(authentication.getName());
     }
 
-    @GetMapping("/{id}/download")
+    @GetMapping("/{fileId}/download")
     public ResponseEntity<Resource> downloadFile(@PathVariable String fileId, Authentication authentication) throws IOException {
         FileDownloadData data = fileService.downloadFile(fileId, authentication.getName());
 

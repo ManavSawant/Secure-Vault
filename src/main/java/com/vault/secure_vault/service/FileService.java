@@ -108,7 +108,7 @@ public class FileService {
     }
     public FileDownloadData downloadFile(String filedId, String ownerEmail) throws IOException {
 
-        FileMetadata file = validateFileAccess(ownerEmail, filedId);
+        FileMetadata file = validateFileAccess(filedId,ownerEmail);
 
         Path filePath = Paths.get(uploadDirectory)
                 .resolve(file.getStoredFilename())

@@ -33,12 +33,6 @@ public class SecurityConfig {
         return new JwtAuthenticationFilter(jwtService, customUserDetailsService);
     }
 
-    @Bean
-    public UserDetailsService userDetailsService() {
-        return customUserDetailsService;
-    }
-
-
 
 
     @Bean
