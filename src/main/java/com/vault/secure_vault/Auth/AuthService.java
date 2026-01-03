@@ -1,34 +1,49 @@
 package com.vault.secure_vault.Auth;
 
-import com.vault.secure_vault.security.JwtService;
 import com.vault.secure_vault.model.User;
-import com.vault.secure_vault.repository.UserRepository;
+import com.vault.secure_vault.security.CustomUserDetailsService;
+import com.vault.secure_vault.security.JwtService;
+import com.vault.secure_vault.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
 public class AuthService {
+
+    private final AuthenticationManager authenticationManager;
+    private final CustomUserDetailsService customUserDetailsService;
     private final JwtService jwtService;
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
 
-    public UserLoginResponseDTO login(UserLoginRequestDTO loginDTO){
+    public AuthResponseDTO login(UserLoginRequestDTO request) {
 
-        User user = userRepository.findByEmail(loginDTO.getEmail())
-                .orElseThrow(()-> new IllegalArgumentException("Invalid credentials"));
-
-        if(!passwordEncoder.matches(loginDTO.getPassword(), user.getPassword())){
-            throw new IllegalArgumentException("Invalid credentials");
+        try{
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            request.getEmail(),
+                            request.getPassword()
+                    )
+            );
+        } catch (AuthenticationException e) {
+            throw new RuntimeException("Invalid username or password");
         }
 
-        String accessToken = jwtService.generateToken(loginDTO.getEmail());
-        String refreshToken = jwtService.generateToken(loginDTO.getEmail());
+        UserDetails userDetails = customUserDetailsService.loadUserByUsername(request.getEmail());
 
-        return UserLoginResponseDTO.builder()
+        String accessToken = jwtService.generateAccessToken(userDetails);
+        String refreshToken = jwtService.generateRefreshToken(userDetails);
+
+        return AuthResponseDTO.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
+                .tokenType("Bearer")
+                .expiresIn(System.currentTimeMillis())
                 .build();
+
     }
 }

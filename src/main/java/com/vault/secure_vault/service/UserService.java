@@ -21,6 +21,7 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
 
     private static final int DEFAULT_CREDITS = 10;
+    private static final long DEFAULT_STORAGE_LIMIT = 500*1024*1024;
 
     private UserResponseDTO mapToResponseDTO(User user) {
         return UserResponseDTO.builder()
@@ -30,6 +31,7 @@ public class UserService {
                 .lastName(user.getLastName())
                 .photoUrl(user.getPhotoUrl())
                 .credits(user.getCredits())
+                .storageLimit(user.getStorageLimit())
                 .createdAt(user.getCreatedAt())
                 .build();
     }
@@ -46,8 +48,9 @@ public class UserService {
                 .photoUrl(dto.getPhotoUrl())
                 .password(passwordEncoder.encode(dto.getPassword()))
                 .credits(DEFAULT_CREDITS)
-                .totalStorageUsed(0)
+                .storageLimit(DEFAULT_STORAGE_LIMIT)
                 .createdAt(Instant.now())
+                .isDeleted(false)
                 .build();
         userRepository.save(user);
         return mapToResponseDTO(user);
@@ -69,5 +72,11 @@ public class UserService {
         return mapToResponseDTO(saveUser);
     }
 
+    public User getByEmail(String email) {
+        return userRepository.findByEmail(email).orElseThrow(()-> new UsernameNotFoundException("User not found"));
+    }
 
+    public User save(User user) {
+        return userRepository.save(user);
+    }
 }

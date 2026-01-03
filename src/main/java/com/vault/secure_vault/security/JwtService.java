@@ -1,19 +1,20 @@
 package com.vault.secure_vault.security;
 
-import com.vault.secure_vault.repository.UserRepository;
+import com.vault.secure_vault.Auth.UserLoginRequestDTO;
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import javax.crypto.SecretKey;
 import java.util.Date;
+import java.util.Map;
+import java.util.function.Function;
 
 @Service
-@RequiredArgsConstructor
 public class JwtService {
 
 
@@ -29,59 +30,48 @@ public class JwtService {
     @Value("${jwt.issuer}")
     private String issuer;
 
-    private SecretKey getSingingKey() {
+    private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(secret.getBytes());
     }
 
-    //generate token
-    public String generateToken(String email){
+    public String generateAccessToken(UserDetails userDetails) {
         return Jwts.builder()
-                .subject(email)
+                .subject(userDetails.getUsername())
                 .issuer(issuer)
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis()+ accessTokenExpiration))
-                .signWith(getSingingKey(), Jwts.SIG.HS256)
+                .expiration(new Date(System.currentTimeMillis()+accessTokenExpiration))
+                .signWith(getSigningKey(), Jwts.SIG.HS256)
                 .compact();
-
     }
-
-    public String generateRefreshToken(String email){
+    public String generateRefreshToken(UserDetails userDetails) {
         return Jwts.builder()
-                .subject(email)
+                .subject(userDetails.getUsername())
                 .issuer(issuer)
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + refreshTokenExpiration))
-                .signWith(getSingingKey(), Jwts.SIG.HS256)
+                .expiration(new Date(System.currentTimeMillis()+refreshTokenExpiration))
+                .signWith(getSigningKey(), Jwts.SIG.HS256)
                 .compact();
-
     }
 
-    private Claims extractClaims(String token){
-        try{
-            return Jwts.parser()
-                    .verifyWith(getSingingKey())
-                    .build()
-                    .parseSignedClaims(token)
-                    .getPayload();
-        }catch (JwtException e){
-            throw new IllegalStateException("Invalid JWT token", e);
-        }
+    private Claims extractAllClaims(String token) {
+        return Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
     }
 
-    public String extractEmail(String token){
-        return extractClaims(token).getSubject();
+    public String extractEmail(String token) {
+        return extractAllClaims(token).getSubject();
     }
 
-    public Date extractExpiration(String token){
-        return extractClaims(token).getExpiration();
-    }
-
-    public boolean isTokenExpired(String token){
-        return extractExpiration(token).before(new Date());
-    }
-
-    public boolean isValidToken(String token, String email){
+    public boolean isTokenValid(String token, UserDetails userDetails) {
         final String username = extractEmail(token);
-        return (username.equals(email) && !isTokenExpired(token));
+        return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
+    }
+
+    public boolean isTokenExpired(String token) {
+        return extractAllClaims(token)
+                .getExpiration().before(new Date());
     }
 }

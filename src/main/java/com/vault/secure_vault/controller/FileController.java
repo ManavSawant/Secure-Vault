@@ -22,11 +22,12 @@ public class FileController {
     private final FileService fileService;
 
     @PostMapping("/upload")
-    public FileUploadResponseDTO fileUpload(@RequestParam("file") MultipartFile file, Authentication authentication) throws Exception {
-        return fileService.uploadFile(file, authentication.getName());
+    public ResponseEntity<FileUploadResponseDTO> fileUpload(@RequestParam("file") MultipartFile file, Authentication authentication) throws Exception {
+        FileUploadResponseDTO responseDTO = fileService.uploadFile(file, authentication.getName());
+        return ResponseEntity.ok(responseDTO);
     }
 
-    @GetMapping("/listFiles")
+    @GetMapping()
     public List<FileUploadResponseDTO> listOfFiles(Authentication authentication) {
         return fileService.listUserFiles(authentication.getName());
     }
@@ -40,6 +41,5 @@ public class FileController {
                 )
                 .body(data.resource());
     }
-
 
 }

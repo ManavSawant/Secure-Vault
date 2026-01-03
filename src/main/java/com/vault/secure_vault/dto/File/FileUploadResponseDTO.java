@@ -1,17 +1,15 @@
 package com.vault.secure_vault.dto.File;
 
 import lombok.Builder;
-import lombok.Data;
-import lombok.Getter;
-
 import java.time.Instant;
 
-@Data
+
 @Builder
-public class FileUploadResponseDTO {
-    private String fileId;
-    private String fileName;
-    private String contentType;
-    private long size;
-    private Instant updatedAt;
-}
+public record FileUploadResponseDTO(
+        String fileId,
+        String fileName,
+        String contentType,
+        long size,
+        Instant updatedAt
+) {}
+

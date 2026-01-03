@@ -36,5 +36,4 @@ public class UserController {
        return userService.updateProfile(email,profileDTO);
    }
 
-
 }
