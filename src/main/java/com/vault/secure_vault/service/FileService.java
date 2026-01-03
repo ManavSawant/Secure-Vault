@@ -8,6 +8,7 @@ import com.vault.secure_vault.exceptions.FileExceptions.StorageLimitExceededExce
 import com.vault.secure_vault.model.FileMetadata;
 import com.vault.secure_vault.model.User;
 import com.vault.secure_vault.repository.FileMetadataRepository;
+import com.vault.secure_vault.repository.UserRepository;
 import com.vault.secure_vault.util.FileDownloadData;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,6 +34,7 @@ public class FileService {
     private final UserService userService;
     private final FileMetadataRepository repository;
     private final UploadProperties uploadProperties;
+    private final UserRepository userRepository;
 
     @Value("${storage.upload-dir}")
     private String uploadDirectory;
@@ -55,15 +57,12 @@ public class FileService {
 
         if(file.getSize() > uploadProperties.getMaxSizeBytes()) throw new FileTooLargeException();
 
-        if(!uploadProperties.getAllowedFileTypes().contains(file.getContentType())) throw new InvalidFileTypeExceptions();
-
         User user = userService.getByEmail(ownerEmail);
-
-        Long usedStorageResult = repository.sumSizedByOwnerEmail(ownerEmail);
-        long usedStorage = (usedStorageResult != null) ? usedStorageResult : 0L;
+        long usedStorage = user.getStorageUsed();
+        long maxAllowedSize = user.getStorageLimit();
         long newFileSize = file.getSize();
 
-        if(usedStorage  + newFileSize > user.getStorageLimit()) {
+        if(usedStorage  + newFileSize > maxAllowedSize) {
             throw new StorageLimitExceededException("Storage limit exceed. Used");
         }
 
@@ -72,31 +71,41 @@ public class FileService {
                 .map(m -> m.getVersion() + 1)
                 .orElse(1);
 
-        String storedFilename = UUID.randomUUID() + "_" +  file.getOriginalFilename();
-
+         String storedFilename = UUID.randomUUID() + "_" +  file.getOriginalFilename();
          Path uploadPath = Paths.get(uploadDirectory).normalize();
          Files.createDirectories(uploadPath);
-
          Path destination = uploadPath.resolve(storedFilename);
-
          Files.copy(file.getInputStream(), destination, StandardCopyOption.REPLACE_EXISTING);
 
-
-        FileMetadata metadata = repository.save(
-                FileMetadata.builder()
-                        .ownerEmail(ownerEmail)
-                        .originalFilename(file.getOriginalFilename())
-                        .storedFilename(storedFilename)
-                        .contentType(file.getContentType())
-                        .size(file.getSize())
-                        .version(nextVersion)
-                        .deleted(false)
-                        .createdAt(Instant.now())
-                        .build()
-        );
+        FileMetadata metadata = FileMetadata.builder()
+                .ownerEmail(ownerEmail)
+                .originalFilename(file.getOriginalFilename())
+                .storedFilename(storedFilename)
+                .contentType(file.getContentType())
+                .size(newFileSize)
+                .version(nextVersion)
+                .deleted(false)
+                .createdAt(Instant.now())
+                .build();
+        repository.save(metadata);
+        user.addUsedStorage(newFileSize);
+        userService.save(user);
 
         return mapToDTO(metadata);
+    }
 
+    @Transactional
+    public void deleteFile(String fileId, String ownerEmail) {
+        FileMetadata file = repository.findByIdAndOwnerEmailAndDeletedFalse(fileId,ownerEmail).orElseThrow(()-> new RuntimeException("File not found"));
+
+        file.setDeleted(true);
+        file.setDeletedAt(Instant.now());
+
+        User user = userRepository.findByEmail(ownerEmail).orElseThrow(()-> new RuntimeException("User not found"));
+
+        user.setStorageUsed(user.getStorageUsed() -  file.getSize());
+        repository.save(file);
+        userRepository.save(user);
     }
 
     public List<FileUploadResponseDTO> listUserFiles(String ownerEmail) {
@@ -132,7 +141,7 @@ public class FileService {
     }
 
 
-    public FileDownloadData downloadFile(String filedId, String ownerEmail) throws IOException {
+    public FileDownloadData downloadFile(String filedId, String ownerEmail)  throws IOException {
 
         FileMetadata file = validateFileAccess(filedId,ownerEmail);
 

@@ -42,4 +42,10 @@ public class FileController {
                 .body(data.resource());
     }
 
+    @DeleteMapping("/{fileId}")
+    public ResponseEntity<Void> softDelete(@PathVariable String fileId, Authentication authentication) {
+        fileService.deleteFile(fileId, authentication.getName());
+        return ResponseEntity.noContent().build();
+    }
+
 }

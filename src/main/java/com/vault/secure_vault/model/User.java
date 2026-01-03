@@ -28,16 +28,27 @@ public class User {
     private String photoUrl;
 
     private int credits;
-
+    private long storageUsed;
     private long storageLimit;
 
     @CreatedDate
     private Instant createdAt;
-
     @LastModifiedDate
     private Instant updatedAt;
-
-
     private boolean isDeleted;
 
+    // Increment storage
+    public void addUsedStorage(long bytes) {
+        this.storageUsed += bytes;
+    }
+
+    // Decrement storage
+    public void removeUsedStorage(long bytes) {
+        this.storageUsed -= bytes;
+        if(this.storageUsed < 0) this.storageUsed = 0;
+    }
+
+    public void markAsDeleted() {
+        this.isDeleted = true;
+    }
 }

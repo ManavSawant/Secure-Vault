@@ -12,9 +12,5 @@ public interface FileMetadataRepository extends MongoRepository<FileMetadata, St
 
     Optional<FileMetadata> findTopByOwnerEmailAndOriginalFilenameOrderByVersionDesc(String email, String originalFilename);
 
-    @Aggregation(pipeline = {
-            "{ $match: { ownerEmail: ?0, deleted: false } }",
-            "{ $group: { _id: null, totalSize: { $sum: \"$size\" } } }"
-    })
-    Long sumSizedByOwnerEmail(String email);
+    Optional<FileMetadata> findByIdAndOwnerEmailAndDeletedFalse(String id,String ownerEmail);
 }
