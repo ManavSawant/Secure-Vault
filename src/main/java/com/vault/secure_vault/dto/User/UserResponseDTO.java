@@ -13,6 +13,7 @@ public record UserResponseDTO (
         String lastName,
         String photoUrl,
         int credits,
+        long storageUsed,
         long storageLimit,
         Instant createdAt
 ) {}

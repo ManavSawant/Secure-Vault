@@ -1,5 +1,6 @@
 package com.vault.secure_vault.controller;
 
+import com.vault.secure_vault.dto.User.SpendCreditsRequestDTO;
 import com.vault.secure_vault.dto.User.UserProfileUpdateDTO;
 import com.vault.secure_vault.dto.User.UserRegistrationRequestDTO;
 import com.vault.secure_vault.dto.User.UserResponseDTO;
@@ -34,6 +35,12 @@ public class UserController {
    public UserResponseDTO updateProfile(Authentication authentication, @RequestBody @Valid UserProfileUpdateDTO profileDTO){
        String email = authentication.getName();
        return userService.updateProfile(email,profileDTO);
+   }
+
+   @PostMapping("/me/spend-credits")
+    public UserResponseDTO spendCredits(Authentication authentication,
+                                        @RequestBody SpendCreditsRequestDTO request){
+       return userService.spendCreditsForStorage(authentication.getName(), request.credits());
    }
 
 }

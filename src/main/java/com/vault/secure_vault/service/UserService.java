@@ -5,11 +5,13 @@ import com.vault.secure_vault.dto.User.UserRegistrationRequestDTO;
 import com.vault.secure_vault.dto.User.UserResponseDTO;
 import com.vault.secure_vault.model.User;
 import com.vault.secure_vault.repository.UserRepository;
+import com.vault.secure_vault.util.constant.StorageConstant;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 
@@ -31,6 +33,7 @@ public class UserService {
                 .lastName(user.getLastName())
                 .photoUrl(user.getPhotoUrl())
                 .credits(user.getCredits())
+                .storageUsed(user.getStorageUsed())
                 .storageLimit(user.getStorageLimit())
                 .createdAt(user.getCreatedAt())
                 .build();
@@ -79,4 +82,24 @@ public class UserService {
     public User save(User user) {
         return userRepository.save(user);
     }
+
+    @Transactional
+    public UserResponseDTO spendCreditsForStorage(String email, int creditsToSpend){
+
+        if(creditsToSpend <= 0) throw new IllegalArgumentException("creditsToSpend must be greater than 0");
+
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("User not found"));
+
+        if(user.getCredits() < creditsToSpend) throw new RuntimeException("Insufficient credit");
+
+        long extraStorage = creditsToSpend * StorageConstant.STORAGE_PER_CREDIT;
+
+        user.setCredits(user.getCredits() - creditsToSpend);
+        user.setStorageLimit(user.getStorageLimit() + extraStorage);
+
+        userRepository.save(user);
+
+        return mapToResponseDTO(user);
+    }
+
 }

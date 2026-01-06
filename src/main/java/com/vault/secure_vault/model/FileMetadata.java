@@ -24,10 +24,12 @@ public class FileMetadata {
     private int version;
 
     private String ownerEmail;
-
     @CreatedDate
     private Instant createdAt;
 
     private boolean deleted;
     private Instant deletedAt;
+
+    private boolean isLatest;
+
 }

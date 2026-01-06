@@ -13,4 +13,19 @@ public interface FileMetadataRepository extends MongoRepository<FileMetadata, St
     Optional<FileMetadata> findTopByOwnerEmailAndOriginalFilenameOrderByVersionDesc(String email, String originalFilename);
 
     Optional<FileMetadata> findByIdAndOwnerEmailAndDeletedFalse(String id,String ownerEmail);
+
+    Optional<FileMetadata> findTopByOwnerEmailAndOriginalFilenameAndDeletedFalseOrderByVersionDesc(
+            String ownerEmail,
+            String originalFilename
+    );
+
+    List<FileMetadata> findByOwnerEmailAndDeletedFalseAndIsLatestTrue(String ownerEmail);
+
+    Optional<FileMetadata> findTopByOwnerEmailAndOriginalFilenameAndDeletedFalseAndVersionLessThanOrderByVersionDesc(
+            String ownerEmail,
+            String originalFilename,
+            int version
+    );
+
+
 }

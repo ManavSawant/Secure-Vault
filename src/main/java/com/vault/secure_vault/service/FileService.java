@@ -2,6 +2,7 @@ package com.vault.secure_vault.service;
 
 import com.vault.secure_vault.config.UploadProperties;
 import com.vault.secure_vault.dto.File.FileUploadResponseDTO;
+import com.vault.secure_vault.dto.User.UserResponseDTO;
 import com.vault.secure_vault.exceptions.FileExceptions.FileTooLargeException;
 import com.vault.secure_vault.exceptions.FileExceptions.InvalidFileTypeExceptions;
 import com.vault.secure_vault.exceptions.FileExceptions.StorageLimitExceededException;
@@ -10,6 +11,7 @@ import com.vault.secure_vault.model.User;
 import com.vault.secure_vault.repository.FileMetadataRepository;
 import com.vault.secure_vault.repository.UserRepository;
 import com.vault.secure_vault.util.FileDownloadData;
+import com.vault.secure_vault.util.constant.StorageConstant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
@@ -25,6 +27,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -63,13 +66,17 @@ public class FileService {
         long newFileSize = file.getSize();
 
         if(usedStorage  + newFileSize > maxAllowedSize) {
-            throw new StorageLimitExceededException("Storage limit exceed. Used");
+            throw new StorageLimitExceededException("Storage limit exceeded. Used: "+usedStorage+", File: "+newFileSize+", Limit: "+maxAllowedSize);
         }
 
-        int nextVersion = repository
-                .findTopByOwnerEmailAndOriginalFilenameOrderByVersionDesc(ownerEmail,file.getOriginalFilename())
-                .map(m -> m.getVersion() + 1)
-                .orElse(1);
+        Optional<FileMetadata> latestFileOpt = repository.findTopByOwnerEmailAndOriginalFilenameAndDeletedFalseOrderByVersionDesc(ownerEmail,file.getOriginalFilename());
+
+        int nextVersion = latestFileOpt.map(f -> f.getVersion() + 1).orElse(1);
+
+        latestFileOpt.ifPresent(latestFile -> {
+            latestFile.setLatest(false);
+            repository.save(latestFile);
+        });
 
          String storedFilename = UUID.randomUUID() + "_" +  file.getOriginalFilename();
          Path uploadPath = Paths.get(uploadDirectory).normalize();
@@ -84,6 +91,7 @@ public class FileService {
                 .contentType(file.getContentType())
                 .size(newFileSize)
                 .version(nextVersion)
+                .isLatest(true)
                 .deleted(false)
                 .createdAt(Instant.now())
                 .build();
@@ -95,17 +103,25 @@ public class FileService {
     }
 
     @Transactional
-    public void deleteFile(String fileId, String ownerEmail) {
+    public void softDeleteFile(String fileId, String ownerEmail) {
         FileMetadata file = repository.findByIdAndOwnerEmailAndDeletedFalse(fileId,ownerEmail).orElseThrow(()-> new RuntimeException("File not found"));
 
         file.setDeleted(true);
         file.setDeletedAt(Instant.now());
-
-        User user = userRepository.findByEmail(ownerEmail).orElseThrow(()-> new RuntimeException("User not found"));
-
-        user.setStorageUsed(user.getStorageUsed() -  file.getSize());
+        file.setLatest(false);
         repository.save(file);
-        userRepository.save(user);
+
+        User user = userRepository.getByEmail(ownerEmail);
+        user.setStorageUsed(user.getStorageUsed() -  file.getSize());
+        userService.save(user);
+
+        if(file.isLatest()) {
+            repository.findTopByOwnerEmailAndOriginalFilenameAndDeletedFalseOrderByVersionDesc(ownerEmail,file.getOriginalFilename())
+                     .ifPresent(prevLatest -> {
+                prevLatest.setLatest(true);
+                repository.save(prevLatest);
+            });
+        }
     }
 
     public List<FileUploadResponseDTO> listUserFiles(String ownerEmail) {

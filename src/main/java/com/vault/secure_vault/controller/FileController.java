@@ -6,6 +6,7 @@ import com.vault.secure_vault.util.FileDownloadData;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -37,14 +38,14 @@ public class FileController {
         FileDownloadData data = fileService.downloadFile(fileId, authentication.getName());
 
         return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\" "+ data.originalFilename() + "\""
-                )
+                "attachment; filename=\"" + data.originalFilename() + "\"")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .body(data.resource());
     }
 
     @DeleteMapping("/{fileId}")
     public ResponseEntity<Void> softDelete(@PathVariable String fileId, Authentication authentication) {
-        fileService.deleteFile(fileId, authentication.getName());
+        fileService.softDeleteFile(fileId, authentication.getName());
         return ResponseEntity.noContent().build();
     }
 
