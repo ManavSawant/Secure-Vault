@@ -69,7 +69,7 @@ public class FileService {
             throw new StorageLimitExceededException("Storage limit exceeded. Used: "+usedStorage+", File: "+newFileSize+", Limit: "+maxAllowedSize);
         }
 
-        Optional<FileMetadata> latestFileOpt = repository.findTopByOwnerEmailAndOriginalFilenameAndDeletedFalseOrderByVersionDesc(ownerEmail,file.getOriginalFilename());
+        Optional<FileMetadata> latestFileOpt = repository.findByOwnerEmailAndOriginalFilenameAndDeletedFalseAndIsLatestTrue(ownerEmail,file.getOriginalFilename());
 
         int nextVersion = latestFileOpt.map(f -> f.getVersion() + 1).orElse(1);
 
@@ -104,7 +104,9 @@ public class FileService {
 
     @Transactional
     public void softDeleteFile(String fileId, String ownerEmail) {
-        FileMetadata file = repository.findByIdAndOwnerEmailAndDeletedFalse(fileId,ownerEmail).orElseThrow(()-> new RuntimeException("File not found"));
+        FileMetadata file = repository.findByIdAndOwnerEmailAndDeletedFalseAndIsLatestTrue(fileId,ownerEmail).orElseThrow(()-> new RuntimeException("File not found"));
+
+        boolean wasLastest = file.isLatest();
 
         file.setDeleted(true);
         file.setDeletedAt(Instant.now());
@@ -112,21 +114,24 @@ public class FileService {
         repository.save(file);
 
         User user = userRepository.getByEmail(ownerEmail);
-        user.setStorageUsed(user.getStorageUsed() -  file.getSize());
+        user.setStorageUsed(user.getStorageUsed() - file.getSize());
         userService.save(user);
 
-        if(file.isLatest()) {
-            repository.findTopByOwnerEmailAndOriginalFilenameAndDeletedFalseOrderByVersionDesc(ownerEmail,file.getOriginalFilename())
-                     .ifPresent(prevLatest -> {
-                prevLatest.setLatest(true);
-                repository.save(prevLatest);
+        if(wasLastest) {
+            repository.findTopByOwnerEmailAndOriginalFilenameAndDeletedFalseAndVersionLessThanOrderByVersionDesc(
+                    ownerEmail,
+                    file.getOriginalFilename(),
+                    file.getVersion()
+            ).ifPresent(prev->{
+                prev.setLatest(true);
+                repository.save(prev);
             });
         }
     }
 
     public List<FileUploadResponseDTO> listUserFiles(String ownerEmail) {
 
-        return repository.findByOwnerEmailAndDeletedFalse(ownerEmail)
+        return repository.findByOwnerEmailAndDeletedFalseOrderByCreatedAtDesc(ownerEmail)
                 .stream()
                 .map(this::mapToDTO)
                 .toList();
@@ -147,13 +152,9 @@ public class FileService {
     }
 
     private FileMetadata validateFileAccess(String filedId, String ownerEmail){
-
-        FileMetadata file = repository.findById(filedId).orElseThrow(() -> new RuntimeException("File not found"));
-
-        if(file.isDeleted()) throw new RuntimeException("File deleted.");
-        if(!file.getOwnerEmail().equals(ownerEmail)) throw new RuntimeException("Access denied.");
-
-        return file;
+        return repository
+                .findByIdAndOwnerEmailAndDeletedFalseAndIsLatestTrue(filedId, ownerEmail)
+                .orElseThrow(()-> new RuntimeException("file not found "));
     }
 
 
