@@ -3,26 +3,21 @@ package com.vault.secure_vault.dto.User;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 
-@Data
-public class UserRegistrationRequestDTO {
+public record UserRegistrationRequestDTO(
 
-    @NotBlank(message = "First name is required")
-    private String firstName;
-    private String lastName;
-    private String photoUrl;
+        @NotBlank(message = "First name is required")
+        String firstName,
 
-    @Email(message = "Invalid email formate")
-    @NotBlank(message = "Email is required")
-    private String email;
+        String lastName,
 
+        String photoUrl,
 
-    @NotBlank(message = "password is required")
-    @Size(min = 6, message = "Password must be at least 6 characters")
-    private String password;
+        @Email(message = "Invalid email format")
+        @NotBlank(message = "Email is required")
+        String email,
 
-}
+        @NotBlank(message = "password is required")
+        @Size(min = 6, message = "Password must be at least 6 characters")
+        String password
+) {}

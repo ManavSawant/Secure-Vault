@@ -8,8 +8,7 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
 
-@Getter
-@Setter
+@Data
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
@@ -50,5 +49,16 @@ public class User {
 
     public void markAsDeleted() {
         this.isDeleted = true;
+    }
+
+    public void spendCredits(int amount){
+        if(this.credits < amount) {
+            throw new RuntimeException("not enough credits");
+        }
+        this.credits -= amount;
+    }
+
+    public void increaseStorageLimit(long bytes) {
+        this.storageLimit += bytes;
     }
 }

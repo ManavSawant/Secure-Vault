@@ -1,6 +1,7 @@
 package com.vault.secure_vault.controller;
 
 import com.vault.secure_vault.dto.File.FileUploadResponseDTO;
+import com.vault.secure_vault.dto.File.FileVersionResponseDTO;
 import com.vault.secure_vault.service.FileService;
 import com.vault.secure_vault.util.FileDownloadData;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +48,11 @@ public class FileController {
     public ResponseEntity<Void> softDelete(@PathVariable String fileId, Authentication authentication) {
         fileService.softDeleteFile(fileId, authentication.getName());
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{fileId}/version")
+    public List<FileVersionResponseDTO> getFileVersions(@PathVariable String fileId, Authentication authentication) {
+        return fileService.getFileVersions(fileId, authentication.getName());
     }
 
 }

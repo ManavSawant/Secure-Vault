@@ -31,5 +31,6 @@ public interface FileMetadataRepository extends MongoRepository<FileMetadata, St
             int version
     );
 
+    List<FileMetadata> findByOwnerEmailAndOriginalFilenameOrderByVersionDesc(String ownerEmail, String originalFilename);
 
 }

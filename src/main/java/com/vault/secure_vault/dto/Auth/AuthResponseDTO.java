@@ -1,4 +1,4 @@
-package com.vault.secure_vault.Auth;
+package com.vault.secure_vault.dto.Auth;
 
 
 import lombok.Builder;

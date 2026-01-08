@@ -39,8 +39,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth->
                         auth.requestMatchers(
                                 "/api/users/register",
-                                        "/api/user/login",
-                                        "/api/users/refresh-token"
+                                        "/api/auth/login",
+                                        "/api/auth/refresh"
                                 ).permitAll()
                                 .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter,

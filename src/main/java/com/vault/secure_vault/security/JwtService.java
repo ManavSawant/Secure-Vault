@@ -1,18 +1,13 @@
 package com.vault.secure_vault.security;
 
-import com.vault.secure_vault.Auth.UserLoginRequestDTO;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import javax.crypto.SecretKey;
 import java.util.Date;
-import java.util.Map;
-import java.util.function.Function;
 
 @Service
 public class JwtService {
@@ -21,11 +16,8 @@ public class JwtService {
     @Value("${jwt.secret}")
     private String secret;
 
-    @Value("${jwt.access-token-expiration-ms}")
+    @Value("${jwt.access-token-expiry-minutes}")
     private long accessTokenExpiration ;
-
-    @Value("${jwt.refresh-token-expiration-ms}")
-    private long refreshTokenExpiration ;
 
     @Value("${jwt.issuer}")
     private String issuer;
@@ -39,16 +31,7 @@ public class JwtService {
                 .subject(userDetails.getUsername())
                 .issuer(issuer)
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis()+accessTokenExpiration))
-                .signWith(getSigningKey(), Jwts.SIG.HS256)
-                .compact();
-    }
-    public String generateRefreshToken(UserDetails userDetails) {
-        return Jwts.builder()
-                .subject(userDetails.getUsername())
-                .issuer(issuer)
-                .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis()+refreshTokenExpiration))
+                .expiration(new Date(System.currentTimeMillis()+accessTokenExpiration * 60_000))
                 .signWith(getSigningKey(), Jwts.SIG.HS256)
                 .compact();
     }
@@ -73,5 +56,9 @@ public class JwtService {
     public boolean isTokenExpired(String token) {
         return extractAllClaims(token)
                 .getExpiration().before(new Date());
+    }
+
+    public long getAccessTokenTtlSeconds() {
+        return accessTokenExpiration / 1000;
     }
 }

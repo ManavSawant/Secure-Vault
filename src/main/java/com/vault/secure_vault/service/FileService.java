@@ -2,6 +2,7 @@ package com.vault.secure_vault.service;
 
 import com.vault.secure_vault.config.UploadProperties;
 import com.vault.secure_vault.dto.File.FileUploadResponseDTO;
+import com.vault.secure_vault.dto.File.FileVersionResponseDTO;
 import com.vault.secure_vault.dto.User.UserResponseDTO;
 import com.vault.secure_vault.exceptions.FileExceptions.FileTooLargeException;
 import com.vault.secure_vault.exceptions.FileExceptions.InvalidFileTypeExceptions;
@@ -175,4 +176,24 @@ public class FileService {
         }
     }
 
+    public List<FileVersionResponseDTO> getFileVersions(String filedId, String ownerEmail) {
+        FileMetadata baseFile = repository.findById(filedId).orElseThrow(() -> new RuntimeException("File not found"));
+
+        if(!baseFile.getOwnerEmail().equals(ownerEmail)){
+            throw new RuntimeException("File does not belong to the owner of this file");
+        }
+
+        return repository.findByOwnerEmailAndOriginalFilenameOrderByVersionDesc(ownerEmail, baseFile.getOriginalFilename())
+                .stream()
+                .map(file -> FileVersionResponseDTO.builder()
+                        .fileId(file.getId())
+                        .version(file.getVersion())
+                        .size(file.getSize())
+                        .isLatest(file.isLatest())
+                        .deleted(file.isDeleted())
+                        .createdAt(file.getCreatedAt())
+                        .build()
+                )
+                .toList();
+    }
 }
