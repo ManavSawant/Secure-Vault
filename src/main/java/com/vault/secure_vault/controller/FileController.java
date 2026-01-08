@@ -1,10 +1,14 @@
 package com.vault.secure_vault.controller;
 
+import com.vault.secure_vault.config.OpenApiConfig;
 import com.vault.secure_vault.dto.File.FileUploadResponseDTO;
 import com.vault.secure_vault.dto.File.FileVersionResponseDTO;
 import com.vault.secure_vault.model.FileMetadata;
 import com.vault.secure_vault.service.FileService;
 import com.vault.secure_vault.util.FileDownloadData;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.io.Resource;
@@ -18,6 +22,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.List;
 
+@Tag(name = "Files", description = "File management APIs")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/files")
@@ -25,6 +30,11 @@ public class FileController {
 
     private final FileService fileService;
 
+    @Operation(
+            summary = "Upload file",
+            description = "Uploads a file and creates a new version if it already exists",
+            security = @SecurityRequirement(name = OpenApiConfig.SECURITY_SCHEME_NAME)
+    )
     @PostMapping("/upload")
     public ResponseEntity<@NotNull FileUploadResponseDTO> fileUpload(
             @RequestParam("file") MultipartFile file,
@@ -36,6 +46,12 @@ public class FileController {
         return ResponseEntity.ok(mapToUploadResponse(metadata));
     }
 
+
+    @Operation(
+            summary = "List user files",
+            description = "Returns all non-deleted files for the logged-in user",
+            security = @SecurityRequirement(name = OpenApiConfig.SECURITY_SCHEME_NAME)
+    )
     @GetMapping
     public ResponseEntity<@NotNull List<FileUploadResponseDTO>>listOfFiles(Authentication authentication) {
 
@@ -47,6 +63,11 @@ public class FileController {
         return ResponseEntity.ok(files);
     }
 
+    @Operation(
+            summary = "Download file",
+            description = "Downloads the latest version of a file",
+            security = @SecurityRequirement(name = OpenApiConfig.SECURITY_SCHEME_NAME)
+    )
     @GetMapping("/{fileId}/download")
     public ResponseEntity<@NotNull Resource> downloadFile(
             @PathVariable String fileId,
@@ -64,6 +85,11 @@ public class FileController {
                 .body(data.resource());
     }
 
+    @Operation(
+            summary = "Delete file",
+            description = "Soft deletes a file",
+            security = @SecurityRequirement(name = OpenApiConfig.SECURITY_SCHEME_NAME)
+    )
     @DeleteMapping("/{fileId}")
     public ResponseEntity<@NotNull Void> softDelete(
             @PathVariable String fileId,
@@ -73,6 +99,13 @@ public class FileController {
         return ResponseEntity.noContent().build();
     }
 
+
+
+    @Operation(
+            summary = "Get file versions",
+            description = "Returns all versions of a file",
+            security = @SecurityRequirement(name = OpenApiConfig.SECURITY_SCHEME_NAME)
+    )
     @GetMapping("/{fileId}/version")
     public ResponseEntity<@NotNull List<FileVersionResponseDTO>>getFileVersions(
             @PathVariable String fileId,

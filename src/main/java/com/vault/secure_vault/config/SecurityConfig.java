@@ -1,8 +1,6 @@
 package com.vault.secure_vault.config;
 
-import com.vault.secure_vault.security.CustomUserDetailsService;
 import com.vault.secure_vault.security.JwtAuthenticationFilter;
-import com.vault.secure_vault.security.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,6 +18,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
+import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
 
 @Configuration
@@ -40,7 +39,10 @@ public class SecurityConfig {
                         auth.requestMatchers(
                                 "/api/users/register",
                                         "/api/auth/login",
-                                        "/api/auth/refresh"
+                                        "/api/auth/refresh",
+                                        "/v3/api-docs/**",
+                                        "/swagger-ui/**",
+                                        "/swagger-ui.html"
                                 ).permitAll()
                                 .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter,
