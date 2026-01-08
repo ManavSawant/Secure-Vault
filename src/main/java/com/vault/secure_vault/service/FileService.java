@@ -43,18 +43,8 @@ public class FileService {
     @Value("${storage.upload-dir}")
     private String uploadDirectory;
 
-    private FileUploadResponseDTO mapToDTO(FileMetadata file) {
-        return FileUploadResponseDTO.builder()
-                .fileId(file.getId())
-                .fileName(file.getOriginalFilename())
-                .contentType(file.getContentType())
-                .size(file.getSize())
-                .updatedAt(file.getCreatedAt())
-                .build();
-    }
-
     @Transactional
-    public FileUploadResponseDTO uploadFile(MultipartFile file, String ownerEmail) throws IOException {
+    public FileMetadata uploadFile(MultipartFile file, String ownerEmail) throws IOException {
 
         if(file.isEmpty()) throw new IllegalArgumentException("File is empty");
 
@@ -62,15 +52,24 @@ public class FileService {
         if(file.getSize() > uploadProperties.getMaxSizeBytes()) throw new FileTooLargeException();
 
         User user = userService.getByEmail(ownerEmail);
+
         long usedStorage = user.getStorageUsed();
         long maxAllowedSize = user.getStorageLimit();
         long newFileSize = file.getSize();
 
         if(usedStorage  + newFileSize > maxAllowedSize) {
-            throw new StorageLimitExceededException("Storage limit exceeded. Used: "+usedStorage+", File: "+newFileSize+", Limit: "+maxAllowedSize);
+            throw new StorageLimitExceededException(
+                            "Storage limit exceeded. Used: "+usedStorage+
+                            ", File: "+newFileSize+
+                            ", Limit: "+maxAllowedSize
+            );
         }
 
-        Optional<FileMetadata> latestFileOpt = repository.findByOwnerEmailAndOriginalFilenameAndDeletedFalseAndIsLatestTrue(ownerEmail,file.getOriginalFilename());
+        Optional<FileMetadata> latestFileOpt =
+                repository.findByOwnerEmailAndOriginalFilenameAndDeletedFalseAndIsLatestTrue(
+                        ownerEmail,
+                        file.getOriginalFilename()
+                );
 
         int nextVersion = latestFileOpt.map(f -> f.getVersion() + 1).orElse(1);
 
@@ -82,6 +81,7 @@ public class FileService {
          String storedFilename = UUID.randomUUID() + "_" +  file.getOriginalFilename();
          Path uploadPath = Paths.get(uploadDirectory).normalize();
          Files.createDirectories(uploadPath);
+
          Path destination = uploadPath.resolve(storedFilename);
          Files.copy(file.getInputStream(), destination, StandardCopyOption.REPLACE_EXISTING);
 
@@ -100,7 +100,7 @@ public class FileService {
         user.addUsedStorage(newFileSize);
         userService.save(user);
 
-        return mapToDTO(metadata);
+        return metadata;
     }
 
     @Transactional
@@ -130,12 +130,10 @@ public class FileService {
         }
     }
 
-    public List<FileUploadResponseDTO> listUserFiles(String ownerEmail) {
+    public List<FileMetadata> listUserFiles(String ownerEmail) {
 
-        return repository.findByOwnerEmailAndDeletedFalseOrderByCreatedAtDesc(ownerEmail)
-                .stream()
-                .map(this::mapToDTO)
-                .toList();
+        return repository.findByOwnerEmailAndDeletedFalseOrderByCreatedAtDesc(ownerEmail);
+
     }
 
     public FileMetadata getFileForUser(String ownerEmail, String fileId) {
@@ -169,6 +167,7 @@ public class FileService {
 
         try{
             Resource resource = new UrlResource(filePath.toUri());
+
             if(!resource.exists() || !resource.isReadable()) throw new IOException("File not found on disk");
             return new FileDownloadData(resource, file.getOriginalFilename());
         }catch (MalformedURLException e){
@@ -176,24 +175,16 @@ public class FileService {
         }
     }
 
-    public List<FileVersionResponseDTO> getFileVersions(String filedId, String ownerEmail) {
+    public List<FileMetadata> getFileVersions(String filedId, String ownerEmail) {
         FileMetadata baseFile = repository.findById(filedId).orElseThrow(() -> new RuntimeException("File not found"));
 
         if(!baseFile.getOwnerEmail().equals(ownerEmail)){
             throw new RuntimeException("File does not belong to the owner of this file");
         }
 
-        return repository.findByOwnerEmailAndOriginalFilenameOrderByVersionDesc(ownerEmail, baseFile.getOriginalFilename())
-                .stream()
-                .map(file -> FileVersionResponseDTO.builder()
-                        .fileId(file.getId())
-                        .version(file.getVersion())
-                        .size(file.getSize())
-                        .isLatest(file.isLatest())
-                        .deleted(file.isDeleted())
-                        .createdAt(file.getCreatedAt())
-                        .build()
-                )
-                .toList();
+        return repository.findByOwnerEmailAndOriginalFilenameOrderByVersionDesc(
+                ownerEmail,
+                baseFile.getOriginalFilename()
+        );
     }
 }

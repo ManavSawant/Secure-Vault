@@ -23,7 +23,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
 
-    public AuthResponseDTO login(UserLoginRequestDTO request) {
+    public AuthResult login(UserLoginRequestDTO request) {
 
         try{
             authenticationManager.authenticate(
@@ -43,33 +43,35 @@ public class AuthService {
                 refreshTokenService.create(userDetails.getUsername(), 7);
 
 
-        return AuthResponseDTO.builder()
-                .accessToken(accessToken)
-                .refreshToken(refreshToken.getToken())
-                .tokenType("Bearer")
-                .expiresIn(15 * 60)
-                .build();
-
+        return new AuthResult(
+                accessToken,
+                refreshToken,
+                jwtService.getAccessTokenTtlSeconds()
+        );
     }
 
-    public AuthResponseDTO refreshToken(RefreshTokenRequestDTO request) {
+    public AuthResult refreshToken(String refreshTokenValue) {
 
-        RefreshToken token = refreshTokenService.validateToken(request.refreshToken());
+        RefreshToken refreshToken =
+                refreshTokenService.validateToken(refreshTokenValue);
 
-        UserDetails userDetails = customUserDetailsService.loadUserByUsername(token.getUserEmail());
+        UserDetails userDetails =
+                customUserDetailsService.loadUserByUsername(
+                        refreshToken.getUserEmail()
+                );
 
         String newAccessToken = jwtService.generateAccessToken(userDetails);
 
-        return AuthResponseDTO.builder()
-                .accessToken(newAccessToken)
-                .refreshToken(token.getToken())
-                .tokenType("Bearer")
-                .expiresIn(900)
-                .build();
+        return new AuthResult(
+                newAccessToken,
+                refreshToken,
+                jwtService.getAccessTokenTtlSeconds()
+        );
     }
 
-    public void logout(RefreshTokenRequestDTO request) {
-        RefreshToken token = refreshTokenService.validateToken(request.refreshToken());
+    public void logout(String refreshTokenValue) {
+        RefreshToken token =
+                refreshTokenService.validateToken(refreshTokenValue);
         refreshTokenService.revokeToken(token);
     }
 }
