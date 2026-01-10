@@ -16,7 +16,7 @@ public class JwtService {
     @Value("${jwt.secret}")
     private String secret;
 
-    @Value("${jwt.access-token-expiry-minutes}")
+    @Value("${jwt.access-token-expiry-ms}")
     private long accessTokenExpiration ;
 
     @Value("${jwt.issuer}")
