@@ -1,8 +1,10 @@
 package com.vault.secure_vault.controller;
 
 import com.vault.secure_vault.Auth.AuthResult;
-import com.vault.secure_vault.dto.Auth.*;
+import com.vault.secure_vault.dto.Auth.AuthResponseDTO;
 import com.vault.secure_vault.Auth.AuthService;
+import com.vault.secure_vault.dto.Auth.RefreshTokenRequestDTO;
+import com.vault.secure_vault.dto.Auth.UserLoginRequestDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -65,28 +67,6 @@ public class AuthController {
         AuthResult result =
                 authService.refreshToken(requestDTO.refreshToken());
         return ResponseEntity.ok(mapToAuthResponse(result));
-    }
-
-    @PostMapping("/forgot-password")
-    public ResponseEntity<PasswordResetResponseDTO> forgotPassword(
-            @RequestBody @Valid ForgotPasswordRequestDTO request
-    ) {
-        authService.forgotPassword(request.email());
-
-        return ResponseEntity.ok(
-                new PasswordResetResponseDTO(true, "Password reset link sent")
-        );
-    }
-
-    @PostMapping("/reset-password")
-    public ResponseEntity<PasswordResetResponseDTO> resetPassword(
-            @RequestBody @Valid ResetPasswordRequestDTO request
-    ) {
-        authService.resetPassword(request.token(), request.newPassword());
-
-        return ResponseEntity.ok(
-                new PasswordResetResponseDTO(true, "Password updated successfully")
-        );
     }
 
 

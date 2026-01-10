@@ -1,21 +1,31 @@
 package com.vault.secure_vault.service;
 
 import com.vault.secure_vault.config.UploadProperties;
+import com.vault.secure_vault.dto.File.FileUploadResponseDTO;
+import com.vault.secure_vault.dto.File.FileVersionResponseDTO;
+import com.vault.secure_vault.dto.User.UserResponseDTO;
 import com.vault.secure_vault.exceptions.FileExceptions.FileTooLargeException;
+import com.vault.secure_vault.exceptions.FileExceptions.InvalidFileTypeExceptions;
 import com.vault.secure_vault.exceptions.FileExceptions.StorageLimitExceededException;
 import com.vault.secure_vault.model.FileMetadata;
 import com.vault.secure_vault.model.User;
 import com.vault.secure_vault.repository.FileMetadataRepository;
 import com.vault.secure_vault.repository.UserRepository;
-import com.vault.secure_vault.storage.FileStorageService;
 import com.vault.secure_vault.util.FileDownloadData;
+import com.vault.secure_vault.util.constant.StorageConstant;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
-import java.io.InputStream;
+import java.net.MalformedURLException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -29,7 +39,9 @@ public class FileService {
     private final FileMetadataRepository repository;
     private final UploadProperties uploadProperties;
     private final UserRepository userRepository;
-    private final FileStorageService fileStorageService;
+
+    @Value("${storage.upload-dir}")
+    private String uploadDirectory;
 
     @Transactional
     public FileMetadata uploadFile(MultipartFile file, String ownerEmail) throws IOException {
@@ -66,17 +78,17 @@ public class FileService {
             repository.save(latestFile);
         });
 
-         String storedPath = ownerEmail + "/" + UUID.randomUUID()+ "_" + file.getOriginalFilename();
-         fileStorageService.upload(
-                 file.getBytes(),
-                 storedPath,
-                 file.getContentType()
-         );
+         String storedFilename = UUID.randomUUID() + "_" +  file.getOriginalFilename();
+         Path uploadPath = Paths.get(uploadDirectory).normalize();
+         Files.createDirectories(uploadPath);
+
+         Path destination = uploadPath.resolve(storedFilename);
+         Files.copy(file.getInputStream(), destination, StandardCopyOption.REPLACE_EXISTING);
 
         FileMetadata metadata = FileMetadata.builder()
                 .ownerEmail(ownerEmail)
                 .originalFilename(file.getOriginalFilename())
-                .storedFilename(storedPath)
+                .storedFilename(storedFilename)
                 .contentType(file.getContentType())
                 .size(newFileSize)
                 .version(nextVersion)
@@ -84,9 +96,7 @@ public class FileService {
                 .deleted(false)
                 .createdAt(Instant.now())
                 .build();
-
         repository.save(metadata);
-
         user.addUsedStorage(newFileSize);
         userService.save(user);
 
@@ -95,11 +105,9 @@ public class FileService {
 
     @Transactional
     public void softDeleteFile(String fileId, String ownerEmail) {
-        FileMetadata file = repository
-                .findByIdAndOwnerEmailAndDeletedFalseAndIsLatestTrue(fileId, ownerEmail)
-                .orElseThrow(() -> new RuntimeException("File not found"));
+        FileMetadata file = repository.findByIdAndOwnerEmailAndDeletedFalseAndIsLatestTrue(fileId,ownerEmail).orElseThrow(()-> new RuntimeException("File not found"));
 
-        boolean wasLatest = file.isLatest();
+        boolean wasLastest = file.isLatest();
 
         file.setDeleted(true);
         file.setDeletedAt(Instant.now());
@@ -110,36 +118,16 @@ public class FileService {
         user.setStorageUsed(user.getStorageUsed() - file.getSize());
         userService.save(user);
 
-        if (wasLatest) {
-            repository
-                    .findTopByOwnerEmailAndOriginalFilenameAndDeletedFalseAndVersionLessThanOrderByVersionDesc(
-                            ownerEmail,
-                            file.getOriginalFilename(),
-                            file.getVersion()
-                    )
-                    .ifPresent(prev -> {
-                        prev.setLatest(true);
-                        repository.save(prev);
-                    });
+        if(wasLastest) {
+            repository.findTopByOwnerEmailAndOriginalFilenameAndDeletedFalseAndVersionLessThanOrderByVersionDesc(
+                    ownerEmail,
+                    file.getOriginalFilename(),
+                    file.getVersion()
+            ).ifPresent(prev->{
+                prev.setLatest(true);
+                repository.save(prev);
+            });
         }
-    }
-
-    @Transactional
-    public FileMetadata restoreFile(String fileId, String ownerEmail) {
-        FileMetadata file = repository.findByIdAndOwnerEmailAndDeletedTrue(fileId,ownerEmail).orElseThrow(() -> new RuntimeException("File not found"));
-
-        file.setDeleted(false);
-        file.setDeletedAt(null);
-        file.setLatest(true);
-
-        repository.findByOwnerEmailAndOriginalFilenameAndDeletedFalseOrderByVersionDesc(ownerEmail,file.getOriginalFilename())
-                .forEach(f->{
-                    if(!f.getId().equals(file.getId())) {
-                        f.setLatest(false);
-                        repository.save(f);
-                    }
-                });
-        return repository.save(file);
     }
 
     public List<FileMetadata> listUserFiles(String ownerEmail) {
@@ -172,11 +160,19 @@ public class FileService {
     public FileDownloadData downloadFile(String filedId, String ownerEmail)  throws IOException {
 
         FileMetadata file = validateFileAccess(filedId,ownerEmail);
-        return fileStorageService.download(
-                file.getStoredFilename(),
-                file.getOriginalFilename(),
-                file.getContentType()
-        );
+
+        Path filePath = Paths.get(uploadDirectory)
+                .resolve(file.getStoredFilename())
+                .normalize();
+
+        try{
+            Resource resource = new UrlResource(filePath.toUri());
+
+            if(!resource.exists() || !resource.isReadable()) throw new IOException("File not found on disk");
+            return new FileDownloadData(resource, file.getOriginalFilename());
+        }catch (MalformedURLException e){
+            throw new IOException("invalid file path", e);
+        }
     }
 
     public List<FileMetadata> getFileVersions(String filedId, String ownerEmail) {
