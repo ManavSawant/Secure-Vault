@@ -1,6 +1,7 @@
 package com.vault.secure_vault.controller;
 
 import com.vault.secure_vault.config.OpenApiConfig;
+import com.vault.secure_vault.dto.File.FileRestoreResponseDTO;
 import com.vault.secure_vault.dto.File.FileUploadResponseDTO;
 import com.vault.secure_vault.dto.File.FileVersionResponseDTO;
 import com.vault.secure_vault.model.FileMetadata;
@@ -11,6 +12,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -20,6 +22,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.time.Instant;
 import java.util.List;
 
 @Tag(name = "Files", description = "File management APIs")
@@ -35,15 +39,13 @@ public class FileController {
             description = "Uploads a file and creates a new version if it already exists",
             security = @SecurityRequirement(name = OpenApiConfig.SECURITY_SCHEME_NAME)
     )
-    @PostMapping("/upload")
-    public ResponseEntity<@NotNull FileUploadResponseDTO> fileUpload(
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<@NotNull FileMetadata> fileUpload(
             @RequestParam("file") MultipartFile file,
             Authentication authentication
-    ) throws Exception {
+    ) throws IOException {
 
-        FileMetadata metadata = fileService.uploadFile(file, authentication.getName());
-
-        return ResponseEntity.ok(mapToUploadResponse(metadata));
+        return ResponseEntity.ok(fileService.uploadFile(file, authentication.getName()));
     }
 
 
@@ -57,9 +59,9 @@ public class FileController {
 
         List<FileUploadResponseDTO> files =
                 fileService.listUserFiles(authentication.getName())
-                .stream()
-                .map(this::mapToUploadResponse)
-                .toList();
+                        .stream()
+                        .map(this::mapToUploadResponse)
+                        .toList();
         return ResponseEntity.ok(files);
     }
 
@@ -78,11 +80,11 @@ public class FileController {
                 fileService.downloadFile(fileId, authentication.getName());
 
         return ResponseEntity.ok().header(
-                HttpHeaders.CONTENT_DISPOSITION,
-                "attachment; filename=\"" + data.originalFilename() + "\""
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + data.originalFilename() + "\""
                 )
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .body(data.resource());
+                .contentType(MediaType.parseMediaType(data.contentType()))
+                .body(new InputStreamResource(data.inputStream()));
     }
 
     @Operation(
@@ -97,6 +99,24 @@ public class FileController {
     ) {
         fileService.softDeleteFile(fileId, authentication.getName());
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{fileId}/restore")
+    public ResponseEntity<FileRestoreResponseDTO> restoreFile(
+            @PathVariable String fileId,
+            Authentication authentication
+    ) {
+        FileMetadata file = fileService.restoreFile(fileId, authentication.getName());
+
+        FileRestoreResponseDTO response = FileRestoreResponseDTO.builder()
+                .fileId(file.getId())
+                .fileName(file.getOriginalFilename())
+                .version(file.getVersion())
+                .restored(true)
+                .restoredAt(Instant.now())
+                .build();
+
+        return ResponseEntity.ok(response);
     }
 
 
