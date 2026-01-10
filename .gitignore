@@ -34,5 +34,6 @@ build/
 
 ### properties ###
 src/main/resources/application.properties
-
+src/main/resources/application-cloud.properties
+src/main/resources/application-local.properties
 .DS_Store.DS_Store
