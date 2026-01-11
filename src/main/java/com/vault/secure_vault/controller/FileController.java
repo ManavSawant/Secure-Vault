@@ -13,19 +13,24 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.io.InputStreamResource;
-import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
 import java.io.IOException;
-import java.io.InputStream;
 import java.time.Instant;
 import java.util.List;
 
+/**
+ * Handles all file related operations:
+ * - Uploading files
+ * - Downloading files
+ * - Listing user files
+ * - Soft delete & restore
+ * - Version history
+ */
 @Tag(name = "Files", description = "File management APIs")
 @RestController
 @RequiredArgsConstructor
@@ -34,11 +39,7 @@ public class FileController {
 
     private final FileService fileService;
 
-    @Operation(
-            summary = "Upload file",
-            description = "Uploads a file and creates a new version if it already exists",
-            security = @SecurityRequirement(name = OpenApiConfig.SECURITY_SCHEME_NAME)
-    )
+
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<@NotNull FileMetadata> fileUpload(
             @RequestParam("file") MultipartFile file,
@@ -49,10 +50,15 @@ public class FileController {
     }
 
 
+    /**
+     * Returns list of all non-deleted files for the user.
+     *
+     * @param authentication authenticated user context
+     * @return list of FileUploadResponseDTO
+     */
     @Operation(
             summary = "List user files",
-            description = "Returns all non-deleted files for the logged-in user",
-            security = @SecurityRequirement(name = OpenApiConfig.SECURITY_SCHEME_NAME)
+            description = "Returns all non-deleted files of the logged-in user"
     )
     @GetMapping
     public ResponseEntity<@NotNull List<FileUploadResponseDTO>>listOfFiles(Authentication authentication) {
@@ -65,14 +71,20 @@ public class FileController {
         return ResponseEntity.ok(files);
     }
 
+    /**
+     * Downloads a file by fileId.
+     *
+     * @param fileId file identifier
+     * @param authentication authenticated user context
+     * @return file as stream
+     */
     @Operation(
             summary = "Download file",
-            description = "Downloads the latest version of a file",
-            security = @SecurityRequirement(name = OpenApiConfig.SECURITY_SCHEME_NAME)
+            description = "Downloads a file by fileId for the logged-in user"
     )
     @GetMapping("/{fileId}/download")
-    public ResponseEntity<@NotNull Resource> downloadFile(
-            @PathVariable String fileId,
+    public ResponseEntity<InputStreamResource> downloadFile(
+            @PathVariable @NotNull String fileId,
             Authentication authentication
     ) throws IOException {
 
@@ -87,10 +99,16 @@ public class FileController {
                 .body(new InputStreamResource(data.inputStream()));
     }
 
+    /**
+     * Soft deletes a file (marks as deleted in DB).
+     * Physical file is NOT removed.
+     *
+     * @param fileId file identifier
+     * @param authentication authenticated user context
+     */
     @Operation(
-            summary = "Delete file",
-            description = "Soft deletes a file",
-            security = @SecurityRequirement(name = OpenApiConfig.SECURITY_SCHEME_NAME)
+            summary = "Delete file (soft delete)",
+            description = "Marks file as deleted. Physical file is retained."
     )
     @DeleteMapping("/{fileId}")
     public ResponseEntity<@NotNull Void> softDelete(
@@ -101,6 +119,18 @@ public class FileController {
         return ResponseEntity.noContent().build();
     }
 
+
+    /**
+     * Restores a previously deleted file.
+     *
+     * @param fileId file identifier
+     * @param authentication authenticated user context
+     * @return restore response
+     */
+    @Operation(
+            summary = "Restore file",
+            description = "Restores a previously deleted file"
+    )
     @PostMapping("/{fileId}/restore")
     public ResponseEntity<FileRestoreResponseDTO> restoreFile(
             @PathVariable String fileId,
@@ -120,11 +150,16 @@ public class FileController {
     }
 
 
-
+    /**
+     * Returns version history of a file.
+     *
+     * @param fileId file identifier
+     * @param authentication authenticated user context
+     * @return list of file versions
+     */
     @Operation(
             summary = "Get file versions",
-            description = "Returns all versions of a file",
-            security = @SecurityRequirement(name = OpenApiConfig.SECURITY_SCHEME_NAME)
+            description = "Returns all versions of a file for the logged-in user"
     )
     @GetMapping("/{fileId}/version")
     public ResponseEntity<@NotNull List<FileVersionResponseDTO>>getFileVersions(
@@ -138,6 +173,12 @@ public class FileController {
                         .toList();
         return ResponseEntity.ok(version);
     }
+
+
+
+
+
+
     private FileUploadResponseDTO mapToUploadResponse(FileMetadata file) {
         return FileUploadResponseDTO.builder()
                 .fileId(file.getId())
@@ -153,7 +194,7 @@ public class FileController {
                 .fileId(file.getId())
                 .version(file.getVersion())
                 .size(file.getSize())
-                .isLatest(file.isLatest())
+                .Latest(file.isLatest())
                 .deleted(file.isDeleted())
                 .createdAt(file.getCreatedAt())
                 .build();

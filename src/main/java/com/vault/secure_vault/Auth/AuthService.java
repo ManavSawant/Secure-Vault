@@ -12,17 +12,31 @@ import com.vault.secure_vault.security.JwtService;
 import com.vault.secure_vault.service.RefreshTokenService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.core.Transient;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.time.Instant;
 import java.util.UUID;
 
+/**
+ * Service responsible for authentication, JWT handling,
+ * refresh token lifecycle, and password reset flows.
+ *
+ * <p>This class contains all business logic related to:
+ * <ul>
+ *     <li>User login</li>
+ *     <li>JWT generation</li>
+ *     <li>Refresh token management</li>
+ *     <li>Password reset (forgot/reset)</li>
+ *     <li>Logout & token revocation</li>
+ * </ul>
+ *
+ * <p><b>Important:</b> Controllers must remain thin. All security logic lives here.
+ */
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -35,6 +49,14 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
 
+
+    /**
+     * Authenticates user credentials and generates JWT + refresh token.
+     *
+     * @param request login request containing email and password
+     * @return AuthResult containing access token, refresh token and expiry
+     * @throws BadCredentialsException if credentials are invalid
+     */
     public AuthResult login(UserLoginRequestDTO request) {
 
         try{
@@ -45,7 +67,7 @@ public class AuthService {
                     )
             );
         } catch (AuthenticationException e) {
-            throw new RuntimeException("Invalid username or password");
+            throw new BadCredentialsException("Invalid username or password");
         }
 
         UserDetails userDetails = customUserDetailsService.loadUserByUsername(request.email());
@@ -62,6 +84,12 @@ public class AuthService {
         );
     }
 
+    /**
+     * Generates a new access token using a valid refresh token.
+     *
+     * @param refreshTokenValue raw refresh token string
+     * @return AuthResult containing new access token and existing refresh token
+     */
     public AuthResult refreshToken(String refreshTokenValue) {
 
         RefreshToken refreshToken =
@@ -81,12 +109,24 @@ public class AuthService {
         );
     }
 
+    /**
+     * Logs out user by revoking refresh token.
+     *
+     * @param refreshTokenValue refresh token to revoke
+     */
     public void logout(String refreshTokenValue) {
         RefreshToken token =
                 refreshTokenService.validateToken(refreshTokenValue);
         refreshTokenService.revokeToken(token);
     }
 
+    /**
+     * Initiates password reset flow by generating a reset token.
+     * Existing tokens for the user are invalidated.
+     *
+     * @param email user email
+     * @throws IllegalStateException if user not found
+     */
     @Transactional
     public void forgotPassword(String email) {
 
@@ -105,9 +145,18 @@ public class AuthService {
                 .build();
 
         passwordResetTokenRepository.save(resetToken);
+        // IMPORTANT:
+        // Email sending should be handled by an EmailService (not here)
 
     }
 
+    /**
+     * Resets user password using a valid reset token.
+     *
+     * @param token       reset token
+     * @param newPassword new raw password
+     * @throws IllegalStateException if token is invalid, expired, or already used
+     */
     @Transactional
     public void resetPassword(String token, String newPassword) {
 

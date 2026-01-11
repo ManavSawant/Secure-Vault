@@ -9,11 +9,24 @@ import io.swagger.v3.oas.models.Components;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * OpenAPI (Swagger) configuration for Secure Vault.
+ * <p>
+ * Defines API metadata and configures JWT Bearer authentication for all secured endpoints.
+ */
 @Configuration
 public class OpenApiConfig {
 
+    /**
+     * Name of the security scheme used in OpenAPI documentation.
+     */
     public static final String SECURITY_SCHEME_NAME = "bearerAuth";
 
+    /**
+     * Configures OpenAPI metadata and security scheme.
+     *
+     * @return configured {@link OpenAPI} instance
+     */
     @Bean
     public OpenAPI openAPI() {
         return new OpenAPI()

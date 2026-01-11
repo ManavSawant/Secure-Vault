@@ -16,6 +16,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Handles all authentication related operations such as:
+ * - Login
+ * - JWT token refresh
+ * - Logout
+ * - Forgot & Reset password flows
+ */
 @Tag(name = "Auth", description = "Authentication APIs")
 @RestController
 @RequiredArgsConstructor
@@ -23,14 +30,16 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
     private final AuthService authService;
 
+    /**
+     * Authenticates a user and issues JWT tokens.
+     *
+     * @param LoginRequestDTO Login credentials (email & password)
+     * @return AuthResponseDTO containing access and refresh tokens
+     */
     @Operation(
-            summary = "Login",
-            description = "Authenticate user and return access + refresh tokens"
+            summary = "Login user",
+            description = "Authenticates user and returns access & refresh tokens"
     )
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Login successful"),
-            @ApiResponse(responseCode = "401", description = "Invalid credentials")
-    })
     @PostMapping("/login")
     public ResponseEntity<@NotNull AuthResponseDTO> login(
             @Valid @RequestBody UserLoginRequestDTO LoginRequestDTO
@@ -39,10 +48,15 @@ public class AuthController {
         return ResponseEntity.ok(mapToAuthResponse(result));
     }
 
-
+    /**
+     * Logs out the user by invalidating refresh token.
+     *
+     * @param requestDTO Refresh token request
+     * @return Success message
+     */
     @Operation(
-            summary = "Logout",
-            description = "Invalidate refresh token"
+            summary = "Logout user",
+            description = "Invalidates refresh token and logs out the user"
     )
     @PostMapping("/logout")
     public ResponseEntity<@NotNull Void> logout(
@@ -52,13 +66,16 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
-
-
+    /**
+     * Refreshes JWT access token using a valid refresh token.
+     *
+     * @param requestDTO Refresh token request
+     * @return New access token response
+     */
     @Operation(
-            summary = "Refresh access token",
-            description = "Generate new access token using refresh token"
+            summary = "Refresh token",
+            description = "Generates a new access token using refresh token"
     )
-    @PostMapping("/refresh")
     public ResponseEntity<@NotNull AuthResponseDTO> refresh(
             @Valid @RequestBody RefreshTokenRequestDTO requestDTO
     ){
@@ -67,6 +84,16 @@ public class AuthController {
         return ResponseEntity.ok(mapToAuthResponse(result));
     }
 
+    /**
+     * Initiates forgot password flow by generating reset token.
+     *
+     * @param request Forgot password request (email)
+     * @return Success message
+     */
+    @Operation(
+            summary = "Forgot password",
+            description = "Generates password reset token and sends email"
+    )
     @PostMapping("/forgot-password")
     public ResponseEntity<PasswordResetResponseDTO> forgotPassword(
             @RequestBody @Valid ForgotPasswordRequestDTO request
@@ -78,6 +105,17 @@ public class AuthController {
         );
     }
 
+
+    /**
+     * Resets user password using valid reset token.
+     *
+     * @param request Reset password request (token + new password)
+     * @return Success message
+     */
+    @Operation(
+            summary = "Reset password",
+            description = "Resets user password using reset token"
+    )
     @PostMapping("/reset-password")
     public ResponseEntity<PasswordResetResponseDTO> resetPassword(
             @RequestBody @Valid ResetPasswordRequestDTO request

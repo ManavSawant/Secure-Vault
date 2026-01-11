@@ -10,17 +10,31 @@ import com.vault.secure_vault.repository.UserRepository;
 import com.vault.secure_vault.storage.FileStorageService;
 import com.vault.secure_vault.util.FileDownloadData;
 import lombok.RequiredArgsConstructor;
-import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
-import java.io.InputStream;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+
+/**
+ * Service responsible for all file-related business logic.
+ *
+ * <p>This includes:
+ * <ul>
+ *     <li>File upload with versioning</li>
+ *     <li>Storage limit enforcement</li>
+ *     <li>Soft delete & restore</li>
+ *     <li>File download</li>
+ *     <li>Version history retrieval</li>
+ * </ul>
+ *
+ * <p><b>Important:</b> This service enforces ownership and storage rules.
+ * Controllers must never bypass this logic.
+ */
 @Service
 @RequiredArgsConstructor
 public class FileService {
@@ -31,6 +45,17 @@ public class FileService {
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
 
+    /**
+     * Uploads a file for a user with automatic versioning and storage validation.
+     *
+     * @param file       file to upload
+     * @param ownerEmail email of file owner
+     * @return saved FileMetadata entity
+     * @throws IOException if file read fails
+     * @throws IllegalArgumentException if file is empty
+     * @throws FileTooLargeException if file exceeds max allowed size
+     * @throws StorageLimitExceededException if user storage limit is exceeded
+     */
     @Transactional
     public FileMetadata uploadFile(MultipartFile file, String ownerEmail) throws IOException {
 
@@ -93,6 +118,13 @@ public class FileService {
         return metadata;
     }
 
+    /**
+     * Soft deletes a file (latest version) for a user.
+     * Does NOT remove the physical file.
+     *
+     * @param fileId file ID
+     * @param ownerEmail owner email
+     */
     @Transactional
     public void softDeleteFile(String fileId, String ownerEmail) {
         FileMetadata file = repository
@@ -124,6 +156,13 @@ public class FileService {
         }
     }
 
+    /**
+     * Restores a previously deleted file and marks it as latest version.
+     *
+     * @param fileId file ID
+     * @param ownerEmail owner email
+     * @return restored FileMetadata
+     */
     @Transactional
     public FileMetadata restoreFile(String fileId, String ownerEmail) {
         FileMetadata file = repository.findByIdAndOwnerEmailAndDeletedTrue(fileId,ownerEmail).orElseThrow(() -> new RuntimeException("File not found"));
@@ -142,11 +181,17 @@ public class FileService {
         return repository.save(file);
     }
 
+    /**
+     * Lists all non-deleted files for a user.
+     *
+     * @param ownerEmail owner email
+     * @return list of FileMetadata
+     */
     public List<FileMetadata> listUserFiles(String ownerEmail) {
 
         return repository.findByOwnerEmailAndDeletedFalseOrderByCreatedAtDesc(ownerEmail);
-
     }
+
 
     public FileMetadata getFileForUser(String ownerEmail, String fileId) {
 
@@ -162,16 +207,31 @@ public class FileService {
         return file;
     }
 
-    private FileMetadata validateFileAccess(String filedId, String ownerEmail){
+    /**
+     * Validates that a file belongs to user, is not deleted, and is latest.
+     *
+     * @param fileId file ID
+     * @param ownerEmail owner email
+     * @return FileMetadata
+     */
+    private FileMetadata validateFileAccess(String fileId, String ownerEmail){
         return repository
-                .findByIdAndOwnerEmailAndDeletedFalseAndIsLatestTrue(filedId, ownerEmail)
+                .findByIdAndOwnerEmailAndDeletedFalseAndIsLatestTrue(fileId, ownerEmail)
                 .orElseThrow(()-> new RuntimeException("file not found "));
     }
 
 
-    public FileDownloadData downloadFile(String filedId, String ownerEmail)  throws IOException {
+    /**
+     * Downloads a file for a user after validating access.
+     *
+     * @param fileId file ID
+     * @param ownerEmail owner email
+     * @return FileDownloadData containing bytes + metadata
+     * @throws IOException if download fails
+     */
+    public FileDownloadData downloadFile(String fileId, String ownerEmail)  throws IOException {
 
-        FileMetadata file = validateFileAccess(filedId,ownerEmail);
+        FileMetadata file = validateFileAccess(fileId,ownerEmail);
         return fileStorageService.download(
                 file.getStoredFilename(),
                 file.getOriginalFilename(),
@@ -179,8 +239,15 @@ public class FileService {
         );
     }
 
-    public List<FileMetadata> getFileVersions(String filedId, String ownerEmail) {
-        FileMetadata baseFile = repository.findById(filedId).orElseThrow(() -> new RuntimeException("File not found"));
+    /**
+     * Retrieves all versions of a file for a user.
+     *
+     * @param fileId base file ID
+     * @param ownerEmail owner email
+     * @return list of FileMetadata ordered by version desc
+     */
+    public List<FileMetadata> getFileVersions(String fileId, String ownerEmail) {
+        FileMetadata baseFile = repository.findById(fileId).orElseThrow(() -> new RuntimeException("File not found"));
 
         if(!baseFile.getOwnerEmail().equals(ownerEmail)){
             throw new RuntimeException("File does not belong to the owner of this file");

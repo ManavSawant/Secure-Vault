@@ -4,16 +4,18 @@ import com.vault.secure_vault.util.FileDownloadData;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
-
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.MalformedURLException;
 import java.nio.file.*;
 
+
+/**
+ * Local filesystem implementation of {@link FileStorageService}.
+ *
+ * <p>Used in development and testing environments. Files are stored
+ * on the server's disk.</p>
+ */
 @Profile("local")
 @Service
 @RequiredArgsConstructor
