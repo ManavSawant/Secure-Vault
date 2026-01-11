@@ -140,7 +140,7 @@ public class AuthService {
         PasswordResetToken resetToken = PasswordResetToken.builder()
                 .email(email)
                 .token(token)
-                .expiryData(Instant.now().plusSeconds(15*60))
+                .expiryDate(Instant.now().plusSeconds(15*60))
                 .used(false)
                 .build();
 
@@ -164,7 +164,7 @@ public class AuthService {
                 .findByTokenAndUsedFalse(token)
                 .orElseThrow(() -> new RuntimeException("Invalid or used token"));
 
-        if (resetToken.getExpiryData().isBefore(Instant.now())) {
+        if (resetToken.getExpiryDate().isBefore(Instant.now())) {
             throw new RuntimeException("Token expired");
         }
 
